@@ -5,11 +5,12 @@ A REST API for employee management, attendance tracking, manual attendance corre
 ## Features
 
 - Employee creation, listing, and filtering
-- Attendance punch-in and punch-out
-- Attendance history and manual corrections
+- Attendance punch-in and punch-out with validation
+- Attendance history and manual corrections with audit trails
 - Monthly employee and department analytics
-- Late-arrival leaderboard and daily department trends
-- MongoDB indexes and pagination
+- Late-arrival leaderboard and daily department attendance trends
+- MongoDB indexes and paginated responses
+- Query-plan inspection for selected analytics and attendance endpoints
 
 ## Tech Stack
 
@@ -21,22 +22,24 @@ A REST API for employee management, attendance tracking, manual attendance corre
 
 ## Prerequisites
 
-Install Python and MongoDB before running the application.
+Install Python 3.12 or later and MongoDB before running the application.
 
 ## Local Setup (Windows PowerShell)
 
-Create and activate a virtual environment:
+### 1. Create and activate a virtual environment
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+### 2. Install dependencies
 
 ```powershell
 pip install -r requirements.txt
 ```
+
+### 3. Configure environment variables
 
 Create a `.env` file in the project root with your local MongoDB settings:
 
@@ -45,15 +48,29 @@ MONGO_URI=mongodb://127.0.0.1:27017
 MONGO_DB=attendance_db
 ```
 
-Start the API:
+Keep `.env` private and do not commit it to GitHub.
+
+### 4. Load sample data (optional)
+
+If you want to initialize the database with the provided sample data, run:
+
+```powershell
+python sample_seed.py
+```
+
+**Warning:** The seeding script resets the relevant sample collections. Run it only when you intend to reset the sample data.
+
+### 5. Start the API
 
 ```powershell
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Open the interactive API documentation at http://127.0.0.1:8000/docs.
+Open the interactive API documentation at:
 
-## Project Files
+http://127.0.0.1:8000/docs
+
+## Project Structure
 
 - `app/main.py` — API endpoints, validation, attendance rules, and analytics.
 - `openapi.yaml` — API contract and business requirements.
@@ -66,6 +83,7 @@ Open the interactive API documentation at http://127.0.0.1:8000/docs.
 
 ## Notes
 
-- Keep `.env` and credentials private. Never commit secrets.
+- MongoDB must be running before starting the API.
+- Keep `.env` files, credentials, and other secrets private.
 - The sample seeding script resets sample collections, so use it carefully.
-- The API is intended to be run locally for evaluation unless deployed separately.
+- The API is intended to run locally for evaluation; deployment requires separate hosting and configuration.
