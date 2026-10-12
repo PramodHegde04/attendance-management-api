@@ -564,18 +564,20 @@ def punch_out(body: PunchOutIn):
 
 
 
+
 @app.get("/attendance")
 def list_attendance(
     emp_code: Optional[str] = None,
+    status: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    status: Optional[str] = None,
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=100),
+    page: int = 1,
+    page_size: int = 20,
 ):
     def validate_date(value: Optional[str], field_name: str):
         if value is None:
             return
+
         try:
             parsed = datetime.strptime(value, "%Y-%m-%d")
             if parsed.date().isoformat() != value:
@@ -598,7 +600,22 @@ def list_attendance(
     if status and status not in {
         "PRESENT", "WFH", "ON_DUTY", "ABSENT", "LEAVE"
     }:
-        raise HTTPException(status_code=422, detail="Invalid status")
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid status",
+        )
+
+    if page < 1:
+        raise HTTPException(
+            status_code=422,
+            detail="page must be at least 1",
+        )
+
+    if page_size < 1:
+        raise HTTPException(
+            status_code=422,
+            detail="page_size must be at least 1",
+        )
 
     query = {}
 
@@ -610,8 +627,10 @@ def list_attendance(
 
     if date_from or date_to:
         query["date"] = {}
+
         if date_from:
             query["date"]["$gte"] = date_from
+
         if date_to:
             query["date"]["$lte"] = date_to
 
@@ -625,12 +644,37 @@ def list_attendance(
         .limit(page_size)
     )
 
+    for record in docs:
+        # Convert punch timestamps only when they are datetime objects.
+        for field in ("punch_in", "punch_out"):
+            value = record.get(field)
+
+            if isinstance(value, datetime):
+                record[field] = to_epoch_ms(value)
+
+        # Ensure optional response fields are consistently present.
+        record.setdefault("half_day", False)
+        record.setdefault("history", [])
+
+        # Normalize timestamps in the audit history.
+        for entry in record["history"]:
+            if isinstance(entry.get("at"), datetime):
+                entry["at"] = to_epoch_ms(entry["at"])
+
+            for field_change in entry.get("changes", {}).values():
+                for key in ("from", "to"):
+                    value = field_change.get(key)
+
+                    if isinstance(value, datetime):
+                        field_change[key] = to_epoch_ms(value)
+
     return {
         "items": docs,
         "total": total,
         "page": page,
         "page_size": page_size,
     }
+
 
 
 @app.patch("/attendance/{emp_code}/{date}")
