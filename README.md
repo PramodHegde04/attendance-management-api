@@ -1,26 +1,71 @@
-# Candidate kit
+# Attendance Management API
 
-Read in this order:
+A REST API for employee management, attendance tracking, manual attendance corrections, and workforce analytics, built with FastAPI and MongoDB.
 
-1. `PROBLEM_STATEMENT.docx`: what you are asked to do, how it is evaluated.
-2. `openapi.yaml`: the API contract and the business rules (R1 - R10).
-3. `DATA_MODEL.md`: what is stored in MongoDB, with nine sample documents.
-4. `app/main.py`: the starter. Put **all** your code in this one file. It must start with `uvicorn app.main:app --port 8000`.
-5. `REVIEW.md`, `DECISIONS.md`: templates to fill in.
+## Features
 
-`sample_data/` holds the nine sample documents as MongoDB Extended JSON; `sample_seed.py` loads them. The grader's dataset is
-much larger and contains cases they do not show.
+- Employee creation, listing, and filtering
+- Attendance punch-in and punch-out
+- Attendance history and manual corrections
+- Monthly employee and department analytics
+- Late-arrival leaderboard and daily department trends
+- MongoDB indexes and pagination
 
-## Local setup
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env            # set MONGO_URI / MONGO_DB (local docker: docker run -p 27017:27017 mongo:7)
-python sample_seed.py
-uvicorn app.main:app --port 8000 --reload
+## Tech Stack
+
+- Python 3.12+
+- FastAPI
+- MongoDB 7.0+
+- PyMongo
+- Uvicorn
+
+## Prerequisites
+
+Install Python and MongoDB before running the application.
+
+## Local Setup (Windows PowerShell)
+
+Create and activate a virtual environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
-MongoDB **6.0 or newer** is required (the grader uses 7.0). MongoDB Atlas free tier (M0) works.
 
-## Submit
-A public Git repository with `app/main.py`, `requirements.txt`, `REVIEW.md`, `DECISIONS.md` and a short `README.md`.
-No `.env`, no secrets, no Dockerfile.
+Install dependencies:
+
+```powershell
+pip install -r requirements.txt
+```
+
+Create a `.env` file in the project root with your local MongoDB settings:
+
+```env
+MONGO_URI=mongodb://127.0.0.1:27017
+MONGO_DB=attendance_db
+```
+
+Start the API:
+
+```powershell
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+Open the interactive API documentation at http://127.0.0.1:8000/docs.
+
+## Project Files
+
+- `app/main.py` — API endpoints, validation, attendance rules, and analytics.
+- `openapi.yaml` — API contract and business requirements.
+- `DATA_MODEL.md` — MongoDB data model.
+- `sample_data/` — Sample data fixtures.
+- `sample_seed.py` — Loads sample data into MongoDB.
+- `REVIEW.md` — Code review findings and testing notes.
+- `DECISIONS.md` — Design decisions and trade-offs.
+- `requirements.txt` — Python dependencies.
+
+## Notes
+
+- Keep `.env` and credentials private. Never commit secrets.
+- The sample seeding script resets sample collections, so use it carefully.
+- The API is intended to be run locally for evaluation unless deployed separately.

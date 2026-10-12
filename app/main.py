@@ -338,6 +338,7 @@ def health():
         )
         
 
+
 @app.post("/employees", status_code=201)
 def create_employee(body: EmployeeIn):
     if body.shift_start == body.shift_end:
@@ -358,7 +359,9 @@ def create_employee(body: EmployeeIn):
         )
 
     doc.pop("_id", None)
+    doc["created_at"] = to_epoch_ms(doc["created_at"])
     return doc
+
 
 
 
@@ -383,6 +386,21 @@ def list_employees(
         .skip(skip)
         .limit(page_size)
     )
+
+    for employee in items:
+        if employee.get("created_at") is not None:
+            employee["created_at"] = to_epoch_ms(employee["created_at"])
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+    for employee in items:
+        if employee.get("created_at") is not None:
+            employee["created_at"] = to_epoch_ms(employee["created_at"])
 
     return {
         "items": items,
