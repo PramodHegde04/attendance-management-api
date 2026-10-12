@@ -677,12 +677,14 @@ def list_attendance(
 
 
 
+
 @app.patch("/attendance/{emp_code}/{date}")
 def regularize_attendance(
     emp_code: str,
     date: str,
     body: RegularizeIn,
 ):
+    # Validate the attendance date.
     try:
         parsed_date = datetime.strptime(date, "%Y-%m-%d")
         if parsed_date.date().isoformat() != date:
@@ -693,10 +695,12 @@ def regularize_attendance(
             detail="date must use YYYY-MM-DD format",
         )
 
+    # Verify that the employee exists.
     emp = db.employees.find_one({"emp_code": emp_code})
     if emp is None:
         raise HTTPException(status_code=404, detail="Employee not found")
 
+    # Find the attendance record.
     record = db.attendance_logs.find_one(
         {"emp_code": emp_code, "date": date}
     )
@@ -706,6 +710,7 @@ def regularize_attendance(
             detail="Attendance record not found",
         )
 
+    # ABSENT and LEAVE records cannot contain punch timestamps.
     if body.status in {"ABSENT", "LEAVE"} and (
         body.punch_in is not None or body.punch_out is not None
     ):
@@ -714,7 +719,11 @@ def regularize_attendance(
             detail="ABSENT or LEAVE cannot include punch timestamps",
         )
 
-    new_status = body.status if body.status is not None else record["status"]
+    new_status = (
+        body.status
+        if body.status is not None
+        else record["status"]
+    )
 
     if new_status in {"ABSENT", "LEAVE"}:
         new_punch_in = None
@@ -731,7 +740,11 @@ def regularize_attendance(
             else record.get("punch_out")
         )
 
-    if new_status in {"PRESENT", "WFH", "ON_DUTY"} and new_punch_in is None:
+    # Validate punch-in requirements.
+    if (
+        new_status in {"PRESENT", "WFH", "ON_DUTY"}
+        and new_punch_in is None
+    ):
         raise HTTPException(
             status_code=422,
             detail="Presence status requires punch_in",
@@ -749,33 +762,44 @@ def regularize_attendance(
                 detail="punch_in must belong to the attendance date",
             )
 
+    # Validate punch-out requirements.
     if new_punch_out is not None:
         if new_punch_in is None or new_punch_out <= new_punch_in:
             raise HTTPException(
                 status_code=422,
                 detail="punch_out must be after punch_in",
             )
+
         if new_punch_out - new_punch_in > timedelta(hours=24):
             raise HTTPException(
                 status_code=422,
                 detail="Punch duration cannot exceed 24 hours",
             )
 
+    # Recalculate derived attendance values.
     if new_punch_in is not None:
         new_late_minutes = compute_late_minutes(
-            new_punch_in, emp["shift_start"]
+            new_punch_in,
+            emp["shift_start"],
         )
     else:
         new_late_minutes = 0
 
     if new_punch_in is not None and new_punch_out is not None:
-        new_work_hours = compute_work_hours(new_punch_in, new_punch_out)
+        new_work_hours = compute_work_hours(
+            new_punch_in,
+            new_punch_out,
+        )
+
+        # Pass all five required arguments, including punch_in.
         new_overtime_minutes = compute_overtime(
+            new_punch_in,
             new_punch_out,
             emp["shift_end"],
             date,
             emp["shift_start"],
         )
+
         new_half_day = new_work_hours < 4.50
     else:
         new_work_hours = None
@@ -792,9 +816,12 @@ def regularize_attendance(
         "half_day": new_half_day,
     }
 
+    # Build the audit changes.
     changes = {}
+
     for field, new_value in final_values.items():
         old_value = record.get(field)
+
         if old_value != new_value:
             if field in {"punch_in", "punch_out"}:
                 old_value = to_epoch_ms(old_value)
@@ -814,7 +841,9 @@ def regularize_attendance(
         )
 
     history_entry = {
-        "at": truncate_to_seconds(datetime.now(timezone.utc).replace(tzinfo=None)),
+        "at": truncate_to_seconds(
+            datetime.now(timezone.utc).replace(tzinfo=None)
+        ),
         "by": body.regularized_by,
         "reason": body.reason,
         "changes": changes,
@@ -844,12 +873,18 @@ def regularize_attendance(
             detail="Attendance record changed concurrently; retry the request",
         )
 
+    # Normalize response timestamps.
     updated.pop("_id", None)
-    updated["punch_in"] = to_epoch_ms(updated.get("punch_in"))
-    updated["punch_out"] = to_epoch_ms(updated.get("punch_out"))
+
+    for field in ("punch_in", "punch_out"):
+        value = updated.get(field)
+        if isinstance(value, datetime):
+            updated[field] = to_epoch_ms(value)
 
     for entry in updated.get("history", []):
-        entry["at"] = to_epoch_ms(entry.get("at"))
+        if isinstance(entry.get("at"), datetime):
+            entry["at"] = to_epoch_ms(entry["at"])
+
         for field_change in entry.get("changes", {}).values():
             for key in ("from", "to"):
                 value = field_change.get(key)
